@@ -1,0 +1,219 @@
+package minimax;
+
+import board.Board;
+import board.Neighbors;
+import board.Position;
+import board.Tile;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Stack;
+
+public class BoardEvaluator {
+
+    public static void main(String[] args) {
+        Board b = new Board();
+        b.setTile(2, 0, Tile.WHITE);
+        b.setTile(5, 0, Tile.WHITE);
+        b.setTile(4, 2, Tile.WHITE);
+        b.setTile(2, 4, Tile.WHITE);
+        b.setTile(2, 7, Tile.WHITE);
+        b.setTile(5, 4, Tile.WHITE);
+        buildTilesList(b);
+        List<LinkedList<Position>> chains = getChains(b, whiteTiles);
+        printChains(chains);
+    }
+
+    public static final int MAX = 1000;
+    public static final int MIN = -1000;
+
+    // Set of features that describes our board and are useful in assigning
+    // a minimax value to the board
+    private static List<Position> whiteTiles;
+    private static List<Position> blackTiles;
+
+    private BoardEvaluator() {
+    }
+
+    /**
+     * Traverses through the board to create two lists of positions, one for
+     * each color. This list contains positions where the appropriate Tile
+     * is on the board.
+     */
+    private static void buildTilesList(Board b) {
+        whiteTiles = new ArrayList<>();
+        blackTiles = new ArrayList<>();
+        for (int x = 0; x < Board.SIZE; x++) {
+            for (int y = 0; y < Board.SIZE; y++) {
+                if (b.getTile(x, y) == Tile.WHITE) {
+                    // Traverse from top to bottom, left to right
+                    whiteTiles.add(new Position(x, y));
+                }
+                if (b.getTile(y, x) == Tile.BLACK) {
+                    // Traverse from left to right, top to bottom
+                    blackTiles.add(new Position(x, y));
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns a list of positions that are validly connected to p.
+     */
+    private static List<Position> getSuccessors(Board b, Position p) {
+        int color = b.getTile(p); // Tile color at position p
+        int other = Board.getOtherColor(color); // Other color
+        List<Position> successors = new ArrayList<>();
+        Neighbors neighbors = new Neighbors(p);
+        while (!neighbors.isEmpty()) {
+            for (Position n : neighbors) {
+                if (n == null || p.isSameDirection(n)) {
+                    // Skip n does not reference a valid position on the board
+                    // or if we have not changed directions to reach this position.
+                    continue;
+                }
+                if (b.getTile(n) == other) {
+                    // If the opposite player is blocking this direction
+                    neighbors.remove(n.direction);
+                    continue;
+                }
+                if (b.getTile(n) == color && !Board.isSameGoal(p, n)) {
+                    // If we found a connected tile that is not in the same goal
+                    // region as position p
+                    successors.add(new Position(n));
+                }
+                neighbors.advance(); // Check one more ring out
+            }
+        }
+        return successors;
+    }
+
+    /**
+     * Performs a DFS to find chains that originate from Position p. A chain is
+     * one that extends all the way to a leaf. This method will also count
+     * the number of unique pairs that exist for a color: A->B and B->A
+     * counts as 1 unique pair.
+     * (2,2)->(3,3)->(5,5) is a chain
+     * (2,2)->(3,3) on the same board is NOT a chain, since there is a position
+     * yet to be explored (5,5)
+     */
+    private static List<LinkedList<Position>> getChains(Board b, Position p) {
+        List<LinkedList<Position>> chains = new ArrayList<>(); // To be returned
+        // Set up our starting search node
+        SearchNode start = new SearchNode(p);
+        // DFS: explore deep, then wide --> Stack
+        Stack<SearchNode> frontier = new Stack<>();
+        frontier.push(start);
+        while (!frontier.isEmpty()) {
+            SearchNode current = frontier.pop(); // Next node/position to explore
+            LinkedList<Position> currentLink = new LinkedList<>(current.chain);
+            currentLink.add(current.pos);
+            if (startsAndEndsInSameGoal(currentLink)) {
+                // Invalid chain: cannot have more than one tile in the same
+                // goal in a chain of tiles.
+                continue;
+            }
+            if (reachedAGoalZone(currentLink)) {
+                // Terminate a chain if it reaches an goal
+                chains.add(currentLink);
+            } 
+            else {
+                List<Position> successors = getSuccessors(b, current.pos);
+                for (Position next : successors) {
+                    if (!currentLink.contains(next)) {
+                        // Do not include tiles twice
+                        frontier.add(new SearchNode(new Position(next), currentLink));
+                    }
+                }
+            }
+        }
+        return chains;
+    }
+
+    private static List<LinkedList<Position>> getChains(Board b, List<Position> tiles) {
+        List<LinkedList<Position>> chains = new LinkedList<>();
+        for (Position p : tiles) {
+            chains.addAll(getChains(b, p));
+        }
+        return chains;
+    }
+
+    /**
+     * Returns true if the chain starts and ends with Positions in the same
+     * goal zone. This is an invalid chain and should be ignored
+     */
+    private static boolean startsAndEndsInSameGoal(LinkedList<Position> chain) {
+//        return chain.size() > 1 &&
+//                Board.isSameGoal(chain.getFirst(), chain.getLast());
+        if (chain.size() > 1) {
+            Position first = chain.getFirst();
+            Position last = chain.getLast();
+            return Board.isSameGoal(first, last);
+        }
+        return false;
+    }
+
+    /**
+     * Returns true if the last Position in the chain references a goal zone.
+     */
+    private static boolean reachedAGoalZone(LinkedList<Position> chain) {
+//        return chain.size() > 1 &&
+//                Board.isGoal(chain.getLast());
+        if (chain.size() > 1) {
+            // For chains larger than 1
+            Position last = chain.getLast();
+            if (Board.isGoal(last)) {
+                // Terminate if we added a goal node
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Helper method to print each position in a chain of linked tiles.
+     */
+    public static void printChain(List<Position> chain) {
+        String s = "";
+        for (Position p : chain) {
+            s = s + p + " ";
+        }
+        System.out.println(s);
+    }
+
+    /**
+     * Helper method to print each chain present on the board.
+     */
+    public static void printChains(List<LinkedList<Position>> chains) {
+        for (LinkedList<Position> chain : chains) {
+            printChain(chain);
+        }
+    }
+
+    private static class SearchNode {
+
+        private Position pos;
+        private LinkedList<Position> chain;
+
+        public SearchNode(Position pos, LinkedList<Position> chain) {
+            this.pos = pos;
+            this.chain = chain;
+        }
+
+        public SearchNode(Position pos) {
+            this(pos, new LinkedList<>());
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            for (Position p : chain) {
+                sb.append(p);
+                sb.append(" ");
+            }
+            return sb.toString();
+        }
+
+    }
+}
