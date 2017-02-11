@@ -3,8 +3,9 @@ package board;
 import java.util.Iterator;
 
 /**
- * This class stores a set of Position objects that is connected (orthogonally or diagonally)
- * to the position (x, y)
+ * This class stores a set of Position objects that is connected (orthogonally
+ * or diagonally) to the Position (x,y). This class does not determine whether
+ * two Tiles are validly connected or not.
  **/
 public class Neighbors implements Iterable<Position> {
 
@@ -23,6 +24,7 @@ public class Neighbors implements Iterable<Position> {
 
     private Position[] neighbors; // Array of positions that are orthogonal or diagonal to (x,y)
     private int size = 0;
+    private int radius = 0;
 
     public Neighbors(int x, int y) {
         neighbors = new Position[8];
@@ -47,6 +49,7 @@ public class Neighbors implements Iterable<Position> {
      * the Position will be removed from the checklist.
      */
     public void advance() {
+        radius = radius + 1;
         for (int i = 0; i < neighbors.length; i++) {
             if (neighbors[i] != null) {
                 neighbors[i].add(UNIT_LIST[i]); // neighbors[i] is modified
@@ -55,6 +58,15 @@ public class Neighbors implements Iterable<Position> {
                 }
             }
         }
+    }
+
+    /**
+     * The radius refers to how much space exists between the neighboring
+     * Positions and the origin Position. A radius of 0 implies a Position
+     * immediately adjacent to the origin Position.
+     */
+    public int getRadius() {
+        return radius;
     }
 
     public Position get(int direction) {
