@@ -206,7 +206,11 @@ public class Board {
         return score;
     }
 
-    public int scoreTiles(List<Position> tiles, int tileCount) {
+    /**
+     * Scores general placement of a player's tiles, such as whether tiles are
+     * placed in goal regions, center of the board, etc.
+     */
+    private int scoreTiles(List<Position> tiles, int tileCount) {
         int score = 0;
         int numPairs = 0;
         int goal1Count = 0;
